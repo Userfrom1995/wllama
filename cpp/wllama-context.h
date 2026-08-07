@@ -19,6 +19,7 @@
 
 #include "server-context.h"
 #include "server-queue.h"
+#include "server-schema.h"
 
 #include "ggml-cpu.h"
 #include "ggml-backend.h"
@@ -300,7 +301,7 @@ struct wllama_context
       server_task task = server_task(SERVER_TASK_TYPE_COMPLETION);
       task.id = rd->get_new_id();
       task.index = 0;
-      task.params = server_task::params_from_json_cmpl(
+      task.params = server_schema::eval_llama_cmpl_schema(
           vocab,
           params,
           meta->slot_n_ctx,
@@ -399,10 +400,24 @@ struct wllama_context
       params.image_max_tokens = req.image_max_tokens.value;
 
     // model params
-    if (req.use_mmap.not_null())
-      params.use_mmap = req.use_mmap.value;
-    if (req.use_mlock.not_null())
-      params.use_mlock = req.use_mlock.value;
+    if (req.use_mmap.not_null() || req.use_mlock.not_null()) {
+      bool use_mmap = req.use_mmap.not_null() ? req.use_mmap.value : true; // true by default
+      bool use_mlock = req.use_mlock.not_null() ? req.use_mlock.value : false;
+      
+      if (use_mmap) {
+          if (use_mlock) {
+              params.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK;
+          } else {
+              params.load_mode = LLAMA_LOAD_MODE_MMAP;
+          }
+      } else {
+          if (use_mlock) {
+              params.load_mode = LLAMA_LOAD_MODE_MLOCK;
+          } else {
+              params.load_mode = LLAMA_LOAD_MODE_NONE;
+          }
+      }
+    }
     if (req.n_gpu_layers.not_null())
       params.n_gpu_layers = req.n_gpu_layers.value;
     if (req.model_alias.not_null())
