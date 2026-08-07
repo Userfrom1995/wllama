@@ -304,7 +304,6 @@ struct wllama_context
       task.params = server_schema::eval_llama_cmpl_schema(
           vocab,
           params,
-          meta->slot_n_ctx,
           meta->logit_bias_eog,
           body);
       task.params.res_type = res_type;
